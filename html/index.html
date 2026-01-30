@@ -1,118 +1,103 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <title>Love Letter – 6 joueurs</title>
+  <meta charset="UTF-8" />
+  <title>💌 Love Letter – Lobby</title>
+  <script src="/socket.io/socket.io.js"></script>
   <style>
-    body { font-family: Arial; background: #f4f4f4; padding: 20px; }
-    .player { margin: 10px 0; padding: 10px; background: white; border-radius: 5px; }
-    .dead { opacity: 0.4; }
-    button { margin: 5px; }
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: auto;
+    }
+    h1 {
+      text-align: center;
+    }
+    .player {
+      padding: 8px;
+      border-bottom: 1px solid #ddd;
+    }
+    .me {
+      font-weight: bold;
+    }
+    .ready {
+      color: green;
+    }
+    .not-ready {
+      color: orange;
+    }
+    #readyBtn {
+      margin-top: 10px;
+      padding: 8px 16px;
+    }
   </style>
 </head>
 <body>
 
 <h1>💌 Love Letter (2–6 joueurs)</h1>
 
-<div id="game"></div>
-<button onclick="startGame()">🎮 Nouvelle partie</button>
+<div id="login">
+  <input id="nameInput" placeholder="Ton pseudo" />
+  <button onclick="setName()">Rejoindre</button>
+</div>
+
+<div id="lobby" style="display:none;">
+  <h2>Lobby</h2>
+  <div id="players"></div>
+  <button id="readyBtn" onclick="ready()">✅ Prêt</button>
+</div>
+
+<div id="game" style="display:none;">
+  <h2>🎮 Partie en cours</h2>
+  <p>La partie a commencé !</p>
+</div>
 
 <script>
-const cards = [
-  { name: "Garde", value: 1, count: 5 },
-  { name: "Prêtre", value: 2, count: 2 },
-  { name: "Baron", value: 3, count: 2 },
-  { name: "Servante", value: 4, count: 2 },
-  { name: "Prince", value: 5, count: 2 },
-  { name: "Roi", value: 6, count: 1 },
-  { name: "Comtesse", value: 7, count: 1 },
-  { name: "Princesse", value: 8, count: 1 }
-];
+  const socket = io();
+  let myId = null;
+  let isReady = false;
 
-let deck = [];
-let players = [];
-let currentPlayer = 0;
-
-function buildDeck() {
-  deck = [];
-  cards.forEach(c => {
-    for (let i = 0; i < c.count; i++) deck.push({...c});
+  socket.on("connect", () => {
+    myId = socket.id;
   });
-  deck.sort(() => Math.random() - 0.5);
-}
 
-function startGame() {
-  const n = prompt("Nombre de joueurs (2 à 6)", 4);
-  if (n < 2 || n > 6) return alert("Nombre invalide");
+  function setName() {
+    const name = document.getElementById("nameInput").value.trim();
+    if (!name) return alert("Entre un pseudo");
+    socket.emit("setName", name);
+    document.getElementById("login").style.display = "none";
+    document.getElementById("lobby").style.display = "block";
+  }
 
-  buildDeck();
-  players = [];
-  for (let i = 0; i < n; i++) {
-    players.push({
-      id: i,
-      hand: [deck.pop()],
-      alive: true,
-      protected: false
+  function ready() {
+    socket.emit("ready");
+    isReady = !isReady;
+    document.getElementById("readyBtn").innerHTML = isReady ? "❌ Ne plus être prêt" : "✅ Prêt";
+  }
+
+  socket.on("state", game => {
+    if (game.started) {
+      document.getElementById("lobby").style.display = "none";
+      document.getElementById("game").style.display = "block";
+      return;
+    }
+
+    const div = document.getElementById("players");
+    div.innerHTML = "";
+
+    game.players.forEach(p => {
+      const line = document.createElement("div");
+      line.className = "player" + (p.id === myId ? " me" : "");
+      line.innerHTML = `
+        ${p.name || "Sans pseudo"}
+        <span class="${p.ready ? "ready" : "not-ready"}">
+          ${p.ready ? "✔ Prêt" : "⏳ Pas prêt"}
+        </span>
+        ${p.id === myId ? " 👈 toi" : ""}
+      `;
+      div.appendChild(line);
     });
-  }
-  currentPlayer = 0;
-  render();
-}
-
-function draw(player) {
-  if (deck.length) player.hand.push(deck.pop());
-}
-
-function playCard(player, index) {
-  const card = player.hand.splice(index, 1)[0];
-  player.protected = false;
-
-  if (card.name === "Princesse") {
-    player.alive = false;
-    alert("💀 Princesse jouée → éliminé !");
-  }
-
-  nextTurn();
-}
-
-function nextTurn() {
-  checkWin();
-  do {
-    currentPlayer = (currentPlayer + 1) % players.length;
-  } while (!players[currentPlayer].alive);
-
-  draw(players[currentPlayer]);
-  render();
-}
-
-function checkWin() {
-  const alive = players.filter(p => p.alive);
-  if (alive.length === 1) {
-    alert(`🏆 Joueur ${alive[0].id + 1} gagne la manche !`);
-  }
-}
-
-function render() {
-  const div = document.getElementById("game");
-  div.innerHTML = `<h2>Tour du joueur ${currentPlayer + 1}</h2>`;
-
-  players.forEach((p, i) => {
-    div.innerHTML += `
-      <div class="player ${!p.alive ? "dead" : ""}">
-        <strong>Joueur ${i + 1}</strong><br>
-        Cartes: ${
-          i === currentPlayer && p.alive
-            ? p.hand.map((c, idx) =>
-                `<button onclick="playCard(players[${i}], ${idx})">
-                  ${c.name}
-                </button>`
-              ).join("")
-            : p.hand.length
-        }
-      </div>
-    `;
   });
-}
 </script>
 
 </body>

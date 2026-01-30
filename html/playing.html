@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Love Letter – 6 joueurs</title>
+  <style>
+    body { font-family: Arial; background: #f4f4f4; padding: 20px; }
+    .player { margin: 10px 0; padding: 10px; background: white; border-radius: 5px; }
+    .dead { opacity: 0.4; }
+    button { margin: 5px; }
+  </style>
+</head>
+<body>
+
+<h1>💌 Love Letter (2–6 joueurs)</h1>
+
+<div id="game"></div>
+<button onclick="startGame()">🎮 Nouvelle partie</button>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+let myId = null;
+
+
+socket.on('joined', id => {
+  myId = id;
+});
+
+function sendReady() {
+  socket.emit('ready');
+}
+function startGame() {
+  socket.emit('start');
+}
+function play(index) {
+  socket.emit('play', index);
+}
+
+socket.on('state', game => {
+  const div = document.getElementById("game");
+  div.innerHTML = `<h2>Tour en cours</h2>`;
+  div.innerHTML += `<p>Partie ${game.started ? 'en cours' : 'en attente'} - Joueur courant: ${game.current + 1}</p>`;
+
+  game.players.forEach((p, idx) => {
+    div.innerHTML += `
+      <div class="player ${!p.alive ? "dead" : ""}">
+        <strong>${p.name || 'Joueur ' + (idx + 1)}</strong> ${!p.alive ? '💀' : ''}
+        ${p.id === myId ? (
+          p.hand.map((c, i) => `<button onclick="play(${i})">${c.name}</button>`).join(' ')
+        ) : (p.hand.length > 0 ? `🂠 ${p.cardCount} carte(s)` : '')}
+        ${p.ready ? ' ✅ Prêt' : ''}
+      </div>
+    `;
+  });
+
+  if (!game.started) {
+    div.innerHTML += `<button onclick="sendReady()">✓ Prêt</button>`;
+    const amReady = game.players.some(p => p.id === myId && p.ready);
+    const allReady = game.players.length >= 2 && game.players.every(p => p.ready);
+    if (amReady && allReady) {
+      div.innerHTML += `<button onclick="startGame()">🎮 Démarrer</button>`;
+    }
+  }
+});
+
+</script>
+
+</body>
+</html>

@@ -12,7 +12,7 @@ const io = new Server(server);
 
 app.use(express.static("public"));
 app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/html/index.html');
+  res.sendFile('/home/cytech/loveletter/html/index.html');
 });
 
 const nets = os.networkInterfaces();
@@ -91,7 +91,7 @@ io.on("connection", socket => {
         return;
     }
 
-    if (game.players.length >= 6) return socket.disconnect();
+    if (game.players.length >= 6) return socket.disconnect(); //A MODIFIER ABSOLUEMENT POUR AFFICHER LE NOM DES JOUEURS DANS LE LOBBY
         game.players.push({
         id: socket.id,
         name: `Joueur ${game.players.length + 1}`,
@@ -103,15 +103,6 @@ io.on("connection", socket => {
 
     socket.emit("joined", socket.id);
     sendState();
-
-    // allow client to set their display name (sent from lobby redirect)
-    socket.on('setName', name => {
-      const player = game.players.find(p => p.id === socket.id);
-      if (!player) return;
-      player.name = String(name).substring(0, 30);
-      console.log(`[setName] ${socket.id} → "${player.name}"`);
-      sendState();
-    });
 
     socket.on("ready", () => {
         const player = game.players.find(p => p.id === socket.id);
