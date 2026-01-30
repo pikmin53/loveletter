@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Love Letter – 6 joueurs</title>
+  <style>
+    body { font-family: Arial; background: #f4f4f4; padding: 20px; }
+    .player { margin: 10px 0; padding: 10px; background: white; border-radius: 5px; }
+    .dead { opacity: 0.4; }
+    button { margin: 5px; }
+  </style>
+</head>
+<body>
+
+<h1>💌 Love Letter (2–6 joueurs)</h1>
+
+<div id="game"></div>
+<button onclick="startGame()">🎮 Nouvelle partie</button>
+
+<script>
+const cards = [
+  { name: "Garde", value: 1, count: 5 },
+  { name: "Prêtre", value: 2, count: 2 },
+  { name: "Baron", value: 3, count: 2 },
+  { name: "Servante", value: 4, count: 2 },
+  { name: "Prince", value: 5, count: 2 },
+  { name: "Roi", value: 6, count: 1 },
+  { name: "Comtesse", value: 7, count: 1 },
+  { name: "Princesse", value: 8, count: 1 }
+];
+
+let deck = [];
+let players = [];
+let currentPlayer = 0;
+
+function buildDeck() {
+  deck = [];
+  cards.forEach(c => {
+    for (let i = 0; i < c.count; i++) deck.push({...c});
+  });
+  deck.sort(() => Math.random() - 0.5);
+}
+
+function startGame() {
+  const n = prompt("Nombre de joueurs (2 à 6)", 4);
+  if (n < 2 || n > 6) return alert("Nombre invalide");
+
+  buildDeck();
+  players = [];
+  for (let i = 0; i < n; i++) {
+    players.push({
+      id: i,
+      hand: [deck.pop()],
+      alive: true,
+      protected: false
+    });
+  }
+  currentPlayer = 0;
+  render();
+}
+
+function draw(player) {
+  if (deck.length) player.hand.push(deck.pop());
+}
+
+function playCard(player, index) {
+  const card = player.hand.splice(index, 1)[0];
+  player.protected = false;
+
+  if (card.name === "Princesse") {
+    player.alive = false;
+    alert("💀 Princesse jouée → éliminé !");
+  }
+
+  nextTurn();
+}
+
+function nextTurn() {
+  checkWin();
+  do {
+    currentPlayer = (currentPlayer + 1) % players.length;
+  } while (!players[currentPlayer].alive);
+
+  draw(players[currentPlayer]);
+  render();
+}
+
+function checkWin() {
+  const alive = players.filter(p => p.alive);
+  if (alive.length === 1) {
+    alert(`🏆 Joueur ${alive[0].id + 1} gagne la manche !`);
+  }
+}
+
+function render() {
+  const div = document.getElementById("game");
+  div.innerHTML = `<h2>Tour du joueur ${currentPlayer + 1}</h2>`;
+
+  players.forEach((p, i) => {
+    div.innerHTML += `
+      <div class="player ${!p.alive ? "dead" : ""}">
+        <strong>Joueur ${i + 1}</strong><br>
+        Cartes: ${
+          i === currentPlayer && p.alive
+            ? p.hand.map((c, idx) =>
+                `<button onclick="playCard(players[${i}], ${idx})">
+                  ${c.name}
+                </button>`
+              ).join("")
+            : p.hand.length
+        }
+      </div>
+    `;
+  });
+}
+</script>
+
+</body>
+</html>
