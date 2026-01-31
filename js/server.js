@@ -4,15 +4,17 @@ const http = require("http");
 const { Server } = require("socket.io"); //const socketIOModule = require("socket.io"); const Server = socketIOModule.Server;
 
 const os = require("os");
+const path = require("path");
 const { send } = require("process");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use(express.static("public"));
+// Serve the project root so `/css`, `/html`, `/js` are accessible
+app.use(express.static(path.join(__dirname, '..')));
 app.get('/', (req, res) => {
-  res.sendFile('/home/cytech/loveletter/html/index.html');
+  res.sendFile(path.join(__dirname, '..', 'html', 'index.html'));
 });
 
 const nets = os.networkInterfaces();
@@ -92,17 +94,33 @@ io.on("connection", socket => {
     }
 
     if (game.players.length >= 6) return socket.disconnect(); //A MODIFIER ABSOLUEMENT POUR AFFICHER LE NOM DES JOUEURS DANS LE LOBBY
-        game.players.push({
-        id: socket.id,
-        name: `Joueur ${game.players.length + 1}`,
-        hand: [],
-        alive: true,
-        ready: false
-        });
+    game.players.push({
+    id: socket.id,
+    name: `Joueur ${game.players.length + 1}`,
+    hand: [],
+    alive: true,
+    ready: false
+    });
 
 
     socket.emit("joined", socket.id);
     sendState();
+
+    socket.on("setName", (name, cb) => {
+        const player = game.players.find(p => p.id === socket.id);
+        if (!player) {
+            if (cb) cb({ ok: false, error: "Player not found" });
+            return;
+        }
+        name = String(name || "").trim().slice(0, 20); // limit length
+        if (!name) {
+            if (cb) cb({ ok: false, error: "Nom invalide" });
+            return;
+        }
+        player.name = name;
+        sendState();
+        if (cb) cb({ ok: true });
+    });
 
     socket.on("ready", () => {
         const player = game.players.find(p => p.id === socket.id);

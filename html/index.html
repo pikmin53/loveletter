@@ -4,33 +4,7 @@
   <meta charset="UTF-8" />
   <title>💌 Love Letter – Lobby</title>
   <script src="/socket.io/socket.io.js"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 600px;
-      margin: auto;
-    }
-    h1 {
-      text-align: center;
-    }
-    .player {
-      padding: 8px;
-      border-bottom: 1px solid #ddd;
-    }
-    .me {
-      font-weight: bold;
-    }
-    .ready {
-      color: green;
-    }
-    .not-ready {
-      color: orange;
-    }
-    #readyBtn {
-      margin-top: 10px;
-      padding: 8px 16px;
-    }
-  </style>
+  <link rel="stylesheet" href="/css/index.css">
 </head>
 <body>
 
@@ -64,9 +38,13 @@
   function setName() {
     const name = document.getElementById("nameInput").value.trim();
     if (!name) return alert("Entre un pseudo");
-    socket.emit("setName", name);
-    document.getElementById("login").style.display = "none";
-    document.getElementById("lobby").style.display = "block";
+    socket.emit("setName", name, (res) => {
+      if (!res || !res.ok) {
+        return alert(res && res.error ? res.error : "Erreur lors de la mise à jour du pseudo");
+      }
+      document.getElementById("login").style.display = "none";
+      document.getElementById("lobby").style.display = "block";
+    });
   }
 
   function ready() {
@@ -98,7 +76,21 @@
       div.appendChild(line);
     });
   });
+
+  // Chat toggle (affiche/masque l'iframe)
+  function toggleChat() {
+    const frame = document.getElementById('chatFrame');
+    const btn = document.getElementById('chatToggle');
+    if (!frame || !btn) return;
+    const hidden = frame.style.display === 'none';
+    frame.style.display = hidden ? 'block' : 'none';
+    btn.textContent = hidden ? '✖' : '💬';
+  }
 </script>
+
+<!-- Chat intégré (utilise message.html) -->
+<button id="chatToggle" aria-label="Toggle chat" onclick="toggleChat()">✖</button>
+<iframe id="chatFrame" src="/html/message.html" title="Chat" frameborder="0"></iframe>
 
 </body>
 </html>
