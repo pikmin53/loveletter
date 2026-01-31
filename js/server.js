@@ -27,158 +27,39 @@ for (const name of Object.keys(nets)) {
 }
 
 
-// game state and set up variables
-const CARDS = [
-  { name: "Espionne", value: 0, count: 2 },
-  { name: "Garde", value: 1, count: 6 },
-  { name: "Prêtre", value: 2, count: 2 },
-  { name: "Baron", value: 3, count: 2 },
-  { name: "Servante", value: 4, count: 2 },
-  { name: "Prince", value: 5, count: 2 },
-  { name: "Chancelier", value: 6, count: 2 },
-  { name: "Roi", value: 7, count: 1 },
-  { name: "Comtesse", value: 7, count: 1 },
-  { name: "Princesse", value: 8, count: 1 }
-];
+// use separated modules for lobby, game and chat
+const lobby = require('./lobby');
+const game = require('./game');
+const chat = require('./chat');
 
-let game = {
-  players: [],
-  deck: [],
-  current: 0,
-  started: false
-};
-
-
-// functions to play the game
-
-function buildDeck() {
-  let deck = [];
-  CARDS.forEach(c => {
-    for (let i = 0; i < c.count; i++) deck.push({...c});
-  });
-  return shuffle(deck);
-}
-
-function shuffle(deck) {
-  for (let i = deck.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [deck[i], deck[j]] = [deck[j], deck[i]];
-  }
-  return deck;
-}
-
-function sendState() {
-  game.players.forEach(player => {
-    const stateForPlayer = {
-      started: game.started,
-      current: game.current,
-      players: game.players.map(p => ({
-        id: p.id,
-        name: p.name,
-        alive: p.alive,
-        ready: p.ready,
-        cardCount: p.hand.length,
-        hand: p.id === player.id ? p.hand : [] // 👈 SECRET
-      }))
-    };
-
-    io.to(player.id).emit("state", stateForPlayer);
-  });
-}
+// initialize modules with references
+lobby.init({ io, game });
+game.init({ io, lobby });
+chat.init({ io, lobby });
 
 // main server loop
-io.on("connection", socket => {
-    if (game.started) {
-        socket.disconnect(true);
-        return;
-    }
+io.on('connection', socket => {
+  if (game.isStarted()) {
+    socket.disconnect(true);
+    return;
+  }
 
-    if (game.players.length >= 6) return socket.disconnect(); //A MODIFIER ABSOLUEMENT POUR AFFICHER LE NOM DES JOUEURS DANS LE LOBBY
-    game.players.push({
-    id: socket.id,
-    name: `Joueur ${game.players.length + 1}`,
-    hand: [],
-    alive: true,
-    ready: false
-    });
+  if (lobby.getPlayerCount() >= 6) return socket.disconnect();
+  lobby.addPlayer(socket);
 
+  socket.emit('joined', socket.id);
+  lobby.broadcastState();
 
-    socket.emit("joined", socket.id);
-    sendState();
+  socket.on('setName', (name, cb) => lobby.setName(socket.id, name, cb));
+  socket.on('ready', () => lobby.toggleReady(socket.id));
+  socket.on('start', () => game.start(socket.id));
+  socket.on('play', index => game.play(socket.id, index));
+  socket.on('chat message', msg => chat.handleMessage(socket.id, msg));
 
-    socket.on("setName", (name, cb) => {
-        const player = game.players.find(p => p.id === socket.id);
-        if (!player) {
-            if (cb) cb({ ok: false, error: "Player not found" });
-            return;
-        }
-        name = String(name || "").trim().slice(0, 20); // limit length
-        if (!name) {
-            if (cb) cb({ ok: false, error: "Nom invalide" });
-            return;
-        }
-        player.name = name;
-        sendState();
-        if (cb) cb({ ok: true });
-    });
-
-    socket.on("ready", () => {
-        const player = game.players.find(p => p.id === socket.id);
-        if (!player) return;
-        player.ready = !player.ready;
-        sendState();
-    });
-
-
-    socket.on("start", () => {
-        if (game.started) return;
-
-        const allReady = game.players.length >= 2 &&
-        game.players.every(p => p.ready);
-
-        if (!allReady) return;
-
-        game.started = true;
-        game.deck = buildDeck();
-        game.players.forEach(p => p.hand = [game.deck.pop()]);
-        game.current = 0;
-        game.players[0].hand.push(game.deck.pop());
-
-        sendState();
-    });
-
-
-  socket.on("play", index => {
-    if (!game.started) return;
-    const playerIndex = game.players.findIndex(p => p.id === socket.id);
-    if (playerIndex === -1) return;
-    const player = game.players[playerIndex];
-    if (playerIndex !== game.current) return;
-    if (index < 0 || index >= player.hand.length) return;
-
-    const card = player.hand.splice(index, 1)[0];
-    if (card.name === "Princesse") {
-      player.alive = false;
-    }
-
-    // advance to next alive player
-    if (game.players.some(p => p.alive)) {
-      do {
-        game.current = (game.current + 1) % game.players.length;
-      } while (!game.players[game.current].alive);
-    }
-
-    if (game.deck.length) {
-      game.players[game.current].hand.push(game.deck.pop());
-    }
-
-    sendState();
-  });
-
-  
-  socket.on("disconnect", () => {
-    game.players = game.players.filter(p => p.id !== socket.id);
-    sendState();
+  socket.on('disconnect', () => {
+    lobby.removePlayer(socket.id);
+    game.handleDisconnect(socket.id);
+    lobby.broadcastState();
   });
 });
 

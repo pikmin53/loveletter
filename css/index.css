@@ -36,18 +36,21 @@ h1, h2 {
 /* Input pseudo */
 #nameInput {
   width: 100%;
-  padding: 10px;
+  padding: 12px 14px;
   border-radius: 8px;
   border: 1px solid #ccc;
-  font-size: 16px;
-  margin-bottom: 10px;
+  font-size: 18px;
+  margin-bottom: 12px;
+  min-height: 48px;
+  box-sizing: border-box;
 }
 
 /* Boutons */
 button {
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   font-size: 16px;
+  min-height: 48px;
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -149,7 +152,18 @@ button:active {
 }
 
 @media (max-width: 700px) {
+  body {
+    padding: 20px 8px;
+  }
+  button {
+    font-size: 18px;
+  }
+  #nameInput {
+    font-size: 18px;
+    padding: 12px;
+  }
   #chatFrame {
+    display: none;
     left: 10px;
     bottom: 10px;
     right: 10px;
